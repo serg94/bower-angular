@@ -24796,20 +24796,6 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
    */
   this.$render = noop;
 
-  /**
-   * @ngdoc method
-   * @name ngModel.NgModelController#$forceModelToViewBound
-   *
-   * @description
-   * This might be called to force update model -> view binding without changing actual model
-   *
-   * It will trigger $formatters pipeline, and in case of changed $viewValue, will run validators and
-   * update the UI.
-   *
-   * For instance you might use this to change the input's value, but keep the original scope.value the same.
-   */
-  this.$forceModelToViewBound = ngModelWatch.bind(this, true);
-
 
   /**
    * @ngdoc method
@@ -25331,35 +25317,50 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
   //    -> scope value did not change since the last digest as
   //       ng-change executes in apply phase
   // 4. view should be changed back to 'a'
-  $scope.$watch(ngModelWatch);
-  function ngModelWatch() {
+  $scope.$watch(function ngModelWatch() {
     var modelValue = ngModelGet($scope);
 
-    // if forced to run formatters and validators, or scope model value and ngModel value are out of sync
+    // if scope model value and ngModel value are out of sync
     // TODO(perf): why not move this to the action fn?
-    if (arguments[0] === true || (modelValue !== ctrl.$modelValue &&
+    if (modelValue !== ctrl.$modelValue &&
        // checks for NaN is needed to allow setting the model to NaN when there's an asyncValidator
-       (ctrl.$modelValue === ctrl.$modelValue || modelValue === modelValue))
+       (ctrl.$modelValue === ctrl.$modelValue || modelValue === modelValue)
     ) {
-      ctrl.$modelValue = ctrl.$$rawModelValue = modelValue;
-      parserValid = undefined;
+      ctrl.$forceModelToViewBound();
+    }
 
-      var formatters = ctrl.$formatters,
-          idx = formatters.length;
+    return modelValue;
+  });
 
-      var viewValue = modelValue;
-      while (idx--) {
+/**
+ * @ngdoc method
+ * @name ngModel.NgModelController#$forceModelToViewBound
+ *
+ * @description
+ * This might be called to force update model -> view binding without changing actual model
+ *
+ * It will trigger $formatters pipeline, and in case of changed $viewValue, will run validators and
+ * update the UI.
+ *
+ * For instance you might use this to change the input's value, but keep the original scope.value the same.
+ */
+this.$forceModelToViewBound = function $forceModelToViewBound() {
+    var modelValue = ngModelGet($scope);
+    ctrl.$modelValue = ctrl.$$rawModelValue = modelValue;
+    parserValid = undefined;
+    var formatters = ctrl.$formatters,
+        idx = formatters.length;
+
+    var viewValue = modelValue;
+    while (idx--) {
         viewValue = formatters[idx](viewValue);
-      }
-      if (ctrl.$viewValue !== viewValue) {
+    }
+    if (ctrl.$viewValue !== viewValue) {
         ctrl.$viewValue = ctrl.$$lastCommittedViewValue = viewValue;
         ctrl.$render();
 
         ctrl.$$runValidators(modelValue, viewValue, noop);
-      }
     }
-
-    return modelValue;
   }
 }];
 
